@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAS — Supermarket Automation Software</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ── Login Screen ── -->
+<section id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-title">SAS Login</div>
+    <div class="login-sub">Sign in with your employee credentials</div>
+    <form id="login-form" class="login-form">
+      <div class="form-group">
+        <label class="form-label" for="emp-id">Employee ID</label>
+        <input class="form-input" id="emp-id" type="text" placeholder="e.g. M001" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="emp-password">Password</label>
+        <input class="form-input" id="emp-password" type="password" placeholder="Enter password" required>
+      </div>
+      <button class="btn btn-accent" style="width:100%;justify-content:center" type="submit">Login</button>
+    </form>
+    <div id="login-error" style="display:none;color:var(--danger);font-size:12px;margin-top:10px"></div>
+</section>
+
+<div id="app-shell" class="hidden">
+<!-- ── Topbar ── -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    SAS
+    <span style="color:var(--muted);font-weight:300;font-size:13px">/ Supermarket Automation</span>
+  </div>
+  <div class="topbar-right">
+    <button class="btn btn-sm" id="theme-toggle" onclick="toggleTheme()">Light Mode</button>
+    <div class="time-display" id="clock">--:--:--</div>
+    <div class="badge badge-muted" id="active-user">Not signed in</div>
+    <button class="btn btn-sm" id="logout-btn" onclick="logout()" style="display:none">Logout</button>
+    <div class="badge badge-green">● LIVE</div>
+  </div>
+</div>
+
+<div class="shell">
+
+  <!-- ── Sidebar ── -->
+  <nav class="sidebar">
+    <div class="sidebar-section-label">Operations</div>
+    <button class="nav-btn active" data-view="pos" onclick="showView('pos', this)">
+      <span class="icon">⬡</span> New Sale
+      <span class="nav-badge" id="cart-count-badge" style="display:none">0</span>
+    </button>
+    <button class="nav-btn" data-view="inventory" onclick="showView('inventory', this)">
+      <span class="icon">▤</span> Inventory
+    </button>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section-label">Management</div>
+
+    <button class="nav-btn" data-view="stats" onclick="showView('stats', this)">
+      <span class="icon">◈</span> Sales Report
+    </button>
+    <button class="nav-btn" data-view="prices" onclick="showView('prices', this)">
+      <span class="icon">◇</span> Price Manager
+    </button>
+    <button class="nav-btn" data-view="reprint" onclick="showView('reprint', this)">
+      <span class="icon">◌</span> Reprint Bill
+    </button>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section-label">System</div>
+
+    <button class="nav-btn" data-view="dashboard" onclick="showView('dashboard', this)">
+      <span class="icon">◉</span> Dashboard
+    </button>
+  </nav>
+
+  <!-- ── Main content ── -->
+  <main class="main">
+
+    <!-- DASHBOARD VIEW -->
+    <div id="view-dashboard" class="view active">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Good morning ☀</div>
+          <div class="page-sub">Here's what's happening at Smart Supermarket today</div>
+        </div>
+        <button class="btn btn-sm" onclick="showView('pos', document.querySelector('.nav-btn'))">
+          + New Sale
+        </button>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Today's Revenue</div>
+          <div class="stat-value accent" id="dash-revenue">KES 0</div>
+          <div class="stat-meta"><span class="up">0 transactions</span> today</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Items Sold</div>
+          <div class="stat-value" id="dash-items-sold">0</div>
+          <div class="stat-meta">across all sales</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Stock Items</div>
+          <div class="stat-value" id="dash-total-items">10</div>
+          <div class="stat-meta">product types</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Low Stock Alerts</div>
+          <div class="stat-value" id="dash-low-stock" style="color:var(--warn)">0</div>
+          <div class="stat-meta">items below 20 units</div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <div class="section-title">Recent Transactions</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Receipt #</th>
+              <th>Cashier</th>
+              <th>Items</th>
+              <th>Total</th>
+              <th>Time</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="recent-txns">
+            <tr>
+              <td colspan="6" style="text-align:center;color:var(--muted);padding:28px">
+                No transactions yet today
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- POS / NEW SALE VIEW -->
+    <div id="view-pos" class="view">
+      <div class="page-header">
+        <div>
+          <div class="page-title">New Sale</div>
+          <div class="page-sub">Click a product or search to add to cart</div>
+        </div>
+      </div>
+
+      <div class="pos-grid">
+
+        <!-- Product list panel -->
+        <div class="pos-products">
+          <div class="pos-search">
+            <input
+              class="search-input"
+              id="pos-search"
+              placeholder="Search by name or code (e.g. ITM001)…"
+              oninput="filterProducts(this.value)"
+            >
+          </div>
+          <div class="product-list" id="product-list"></div>
+        </div>
+
+        <!-- Cart panel -->
+        <div class="cart-panel">
+          <div class="cart-header">
+            <span>Cart</span>
+            <button class="btn btn-sm btn-danger" onclick="clearCart()">Clear</button>
+          </div>
+          <div class="cart-items" id="cart-items">
+            <div class="cart-empty">
+              <div class="cart-empty-icon">◻</div>
+              <div>Cart is empty</div>
+              <div style="font-size:11px;margin-top:4px;color:var(--muted2)">Add items from the left</div>
+            </div>
+          </div>
+          <div class="cart-footer">
+            <div class="cart-total-row">
+              <div class="cart-total-label">Total Payable</div>
+              <div class="cart-total-amount" id="cart-total">KES 0.00</div>
+            </div>
+            <button
+              class="btn btn-accent"
+              style="width:100%;justify-content:center"
+              onclick="processCheckout()"
+            >
+              Process Sale →
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- INVENTORY VIEW -->
+    <div id="view-inventory" class="view">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Inventory</div>
+          <div class="page-sub">All product stock levels and pricing</div>
+        </div>
+        <button class="btn btn-accent btn-sm" onclick="openRestockModal()">+ Restock Item</button>
+      </div>
+
+      <div class="inv-controls">
+        <input
+          class="inv-search"
+          id="inv-search"
+          placeholder="Search products…"
+          oninput="renderInventoryTable(this.value)"
+        >
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Product Name</th>
+              <th>Unit</th>
+              <th>Sell Price</th>
+              <th>Cost Price</th>
+              <th>Stock</th>
+              <th>Level</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="inventory-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SALES REPORT VIEW -->
+    <div id="view-stats" class="view">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Sales Report</div>
+          <div class="page-sub">Revenue and profit breakdown</div>
+        </div>
+      </div>
+
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card">
+          <div class="stat-label">Total Revenue</div>
+          <div class="stat-value accent" id="stat-revenue">KES 0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Profit</div>
+          <div class="stat-value" id="stat-profit" style="color:var(--accent)">KES 0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Units Sold</div>
+          <div class="stat-value" id="stat-units">0</div>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="chart-area">
+          <div class="section-title">Revenue by product</div>
+          <div class="chart-bars" id="revenue-chart"></div>
+        </div>
+        <div class="chart-area">
+          <div class="section-title">Profit by product</div>
+          <div class="chart-bars" id="profit-chart"></div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <div class="section-title">Item Breakdown</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Product</th>
+              <th>Qty Sold</th>
+              <th>Revenue</th>
+              <th>Cost</th>
+              <th>Profit</th>
+              <th>Margin</th>
+            </tr>
+          </thead>
+          <tbody id="stats-tbody">
+            <tr>
+              <td colspan="7" style="text-align:center;color:var(--muted);padding:28px">
+                No sales recorded yet
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PRICE MANAGER VIEW -->
+    <div id="view-prices" class="view">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Price Manager</div>
+          <div class="page-sub">Update selling prices — changes are logged automatically</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Product</th>
+              <th>Unit</th>
+              <th>Current Price</th>
+              <th>Cost Price</th>
+              <th>Margin</th>
+              <th>New Price</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="price-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- REPRINT BILL VIEW -->
+    <div id="view-reprint" class="view">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Reprint Bill</div>
+          <div class="page-sub">Retrieve and print previously completed sales receipts</div>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="padding:16px;margin-bottom:16px">
+        <div style="display:flex;gap:10px;align-items:center;max-width:520px">
+          <input class="form-input" id="reprint-id" type="number" min="1" placeholder="Enter receipt number (e.g. 1)">
+          <button class="btn btn-accent" onclick="reprintById()">Find Receipt</button>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <div class="section-title">Recent Receipts</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Receipt #</th>
+              <th>Cashier</th>
+              <th>Items</th>
+              <th>Total</th>
+              <th>Time</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="reprint-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── Receipt Modal ── -->
+<div class="modal-overlay" id="receipt-modal">
+  <div class="modal">
+    <div class="receipt-header">
+      <div style="color:var(--accent);font-size:28px;margin-bottom:8px">✓</div>
+      <div class="receipt-shop">SMART SUPERMARKET</div>
+      <div class="receipt-addr">Nairobi, Kenya · Tel: +254-700-000-000</div>
+    </div>
+    <div style="text-align:center;margin-bottom:12px">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px">
+        Receipt No.
+      </div>
+      <div class="receipt-no" id="r-no">—</div>
+    </div>
+    <div class="receipt-meta">
+      <div class="receipt-meta-row"><span>Date</span><span id="r-date">—</span></div>
+      <div class="receipt-meta-row"><span>Time</span><span id="r-time">—</span></div>
+      <div class="receipt-meta-row"><span>Cashier</span><span id="r-cashier">—</span></div>
+    </div>
+    <div class="receipt-divider"></div>
+    <div id="receipt-lines"></div>
+    <div class="receipt-divider"></div>
+    <div class="receipt-total-row">
+      <span>Total Payable</span>
+      <span class="receipt-total-amt" id="r-total">—</span>
+    </div>
+    <div class="receipt-footer">Thank you for shopping with us!</div>
+    <div style="margin-top:20px;display:flex;gap:8px;justify-content:center">
+      <button class="btn" onclick="closeModal('receipt-modal')">Close</button>
+      <button class="btn btn-accent" onclick="closeModal('receipt-modal')">New Sale →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Restock Modal ── -->
+<div class="modal-overlay" id="restock-modal">
+  <div class="modal" style="width:380px">
+    <div style="font-size:16px;font-weight:700;margin-bottom:20px">Restock Item</div>
+    <div class="form-group">
+      <label class="form-label">Product</label>
+      <select class="form-input" id="restock-item-select"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Quantity to Add</label>
+      <input class="form-input" type="number" id="restock-qty" min="1" placeholder="e.g. 100">
+    </div>
+    <div class="login-help" id="restock-actor">Logged by: —</div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeModal('restock-modal')">Cancel</button>
+      <button class="btn btn-accent" onclick="confirmRestock()">Confirm Restock</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast container ── -->
+<div class="toast-container" id="toasts"></div>
+
+<!-- JavaScript loaded last so the DOM is ready -->
+<script src="app.js"></script>
+</div>
+
+</body>
+</html>

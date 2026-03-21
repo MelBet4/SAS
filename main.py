@@ -11,14 +11,14 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from database import init_db
 from models import (
-    get_all_items, get_item_by_code, get_item_by_id,
-    update_price, restock_item,
-    create_transaction, get_transaction,
-    sales_statistics,
+    get_all_items, get_item_by_code, get_item_by_id, #inventory operations
+    update_price, restock_item, #update inventory
+    create_transaction, get_transaction, #cashier and automate stock changes
+    sales_statistics, #generate manager's report
 )
 from reports import print_bill, print_inventory, print_sales_stats
 from datetime import date
-
+from models import authenticate_user
 
 # ─────────────────────────────────────────────────────────
 #  Helpers
@@ -56,17 +56,46 @@ def choose(options: list):
             pass
         print("  Invalid choice. Try again.")
 
+def login():
+    while True:
+        clear()
+        print("=" * 56)
+        print(" EMPLOYEE LOGIN")
+        print("=" * 56)
+
+        empID = input("Employee ID: ").strip().upper()
+
+        if empID == "EXIT":
+            print("\nGoodbye!\n")
+            sys.exit(0)   #clean exit
+
+        password = input("Password: ").strip()
+
+        user = authenticate_user(empID, password)
+
+        if not user:
+            print("Invalid credentials")
+            pause()
+            continue
+
+        print(f"Welcome {user['firstName']} ({user['role']})")
+        pause()
+        return user
 
 # ─────────────────────────────────────────────────────────
 #  CASHIER FLOW  –  New Sale
 # ─────────────────────────────────────────────────────────
 
-def new_sale():
-    clear()
+def new_sale(user):
+    if user["role"] != "cashier":
+        print("  ✗  Access denied. Cashier role required.")
+        pause()
+        return
+    clear() #clears terminal and leads to cashier's section/page
     print("=" * 56)
     print("  NEW SALES TRANSACTION")
     print("=" * 56)
-    cashier = prompt("Cashier name (Enter to use 'clerk')", allow_blank=True) or "clerk"
+    cashier = user["firstName"]
     cart = []
 
     while True:
@@ -85,6 +114,7 @@ def new_sale():
         print(f"  ✔  {item['name']} — KES {item['unit_price']:.2f}/{item['unit']}"
               f"  (Stock: {item['stock_qty']})")
 
+        #confirm if stock is available
         qty = prompt(f"Quantity ({item['unit']})", cast=float)
         if qty <= 0:
             print("  ✗  Quantity must be positive.")
@@ -93,7 +123,7 @@ def new_sale():
             print(f"  ✗  Only {item['stock_qty']} in stock.")
             continue
 
-        # Check if already in cart; if so, add qty
+        # Check if already in cart; if so, add qty - prevent duplicate entries
         for entry in cart:
             if entry["item_id"] == item["item_id"]:
                 entry["quantity"] += qty
@@ -121,7 +151,11 @@ def new_sale():
 #  INVENTORY MENU
 # ─────────────────────────────────────────────────────────
 
-def inventory_menu():
+def inventory_menu(user):
+    if user["role"] != "inventory":
+        print("  ✗  Access denied. Inventory role required.")
+        pause()
+        return
     while True:
         clear()
         print("=" * 56)
@@ -139,10 +173,14 @@ def inventory_menu():
             print_inventory(items)
             pause()
         elif action == "restock":
-            restock_flow()
+            restock_flow(user)
 
 
-def restock_flow():
+def restock_flow(user):
+    if user["role"] != "inventory":
+        print("  ✗  Access denied. Inventory role required.")
+        pause()
+        return
     clear()
     print("  RESTOCK ITEM\n")
     items = get_all_items()
@@ -155,7 +193,7 @@ def restock_flow():
         pause()
         return
     qty = prompt(f"Quantity to add ({item['unit']})", cast=float)
-    employee = prompt("Employee name (Enter to use 'employee')", allow_blank=True) or "employee"
+    employee = user["empID"]
     new_stock = restock_item(item_id, qty, employee)
     print(f"\n  ✔  {item['name']} restocked. New stock: {new_stock} {item['unit']}")
     pause()
@@ -165,7 +203,12 @@ def restock_flow():
 #  MANAGER MENU  –  Price Changes
 # ─────────────────────────────────────────────────────────
 
-def manager_menu():
+#manager's menu
+def manager_menu(user):
+    if user["role"] != "manager":
+        print("  ✗  Access denied. Manager role required.")
+        pause()
+        return
     while True:
         clear()
         print("=" * 56)
@@ -187,6 +230,7 @@ def manager_menu():
             reprint_flow()
 
 
+#manager changes price of item
 def change_price_flow():
     clear()
     print("  CHANGE ITEM PRICE\n")
@@ -205,7 +249,7 @@ def change_price_flow():
         print(f"\n  ✔  Price updated: KES {old:.2f} → KES {new_price:.2f}")
     pause()
 
-
+#manager to generate statistic report
 def stats_flow():
     clear()
     print("  SALES STATISTICS\n")
@@ -220,12 +264,12 @@ def stats_flow():
         print_sales_stats(rows, date_from, date_to)
     pause()
 
-
+#manager reprint's receipt
 def reprint_flow():
     clear()
     print("  REPRINT BILL\n")
     txn_id = prompt("Enter Transaction (Receipt) Number", cast=int)
-    txn, lines = get_transaction(txn_id)
+    txn, lines = get_transaction(txn_id) #get receipt by the transaction id
     if not txn:
         print("  ✗  Transaction not found.")
         pause()
@@ -253,26 +297,45 @@ def reprint_flow():
 def main():
     init_db()
 
+    user = None
+    while not user:
+        user = login()
+
     while True:
         clear()
         print("=" * 56)
         print("  SUPERMARKET AUTOMATION SOFTWARE  (SAS)")
         print("=" * 56)
-        action = choose([
-            ("sale",      "New Sale  (Cashier)"),
-            ("inventory", "Inventory Management"),
-            ("manager",   "Manager Panel"),
-            ("quit",      "Exit"),
-        ])
+        role = user["role"]
+        if role == "cashier":
+            options = [
+                ("sale", "New Sale  (Cashier)"),
+                ("quit", "Exit"),
+            ]
+        elif role == "inventory":
+            options = [
+                ("inventory", "Inventory Management"),
+                ("quit", "Exit"),
+            ]
+        elif role == "manager":
+            options = [
+                ("manager", "Manager Panel"),
+                ("quit", "Exit"),
+            ]
+        else:
+            print("\n  ✗  Unknown role. Access denied.\n")
+            sys.exit(1)
+
+        action = choose(options)
         if action == "quit":
             print("\n  Goodbye!\n")
             sys.exit(0)
         elif action == "sale":
-            new_sale()
+            new_sale(user)
         elif action == "inventory":
-            inventory_menu()
+            inventory_menu(user)
         elif action == "manager":
-            manager_menu()
+            manager_menu(user)
 
 
 if __name__ == "__main__":

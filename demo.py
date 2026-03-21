@@ -11,7 +11,7 @@ db_path = os.path.join(os.path.dirname(__file__), "sas.db")
 if os.path.exists(db_path):
     os.remove(db_path)
 
-from database import init_db
+from database import init_db 
 from models import (
     get_all_items, get_item_by_code,
     update_price, restock_item,

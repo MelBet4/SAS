@@ -5,9 +5,23 @@ Handles SQLite setup, schema creation, and seed data.
 
 import sqlite3
 import os
-from datetime import date
+import hashlib
+import secrets
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "sas.db")
+
+
+def _hash_password(password: str, salt: str = None) -> str:
+    """Return a PBKDF2 password hash string."""
+    salt = salt or secrets.token_hex(16)
+    iterations = 200_000
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        iterations,
+    ).hex()
+    return f"pbkdf2_sha256${iterations}${salt}${digest}"
 
 
 def get_connection():
@@ -75,13 +89,23 @@ def init_db():
             unit_price    REAL    NOT NULL,   -- price at time of sale (snapshot)
             item_total    REAL    NOT NULL    -- quantity * unit_price
         );
+
+        -- Users 
+        CREATE TABLE IF NOT EXISTS Users (
+            userID INTEGER PRIMARY KEY AUTOINCREMENT,
+            empID TEXT NOT NULL UNIQUE,
+            firstName TEXT NOT NULL,
+            lastName TEXT NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN('manager', 'cashier','inventory'))
+        );
     """)
 
     # ------------------------------------------------------------------ #
     #  Seed sample items if table is empty
     # ------------------------------------------------------------------ #
     c.execute("SELECT COUNT(*) FROM items")
-    if c.fetchone()[0] == 0:
+    if c.fetchone()[0] == 0: #check if table is empty
         sample_items = [
             ("ITM001", "Unga Maize Flour 2kg",  "pack",   145.00,  110.00, 200),
             ("ITM002", "Cooking Oil 1L",         "bottle", 320.00,  250.00, 150),
@@ -94,10 +118,32 @@ def init_db():
             ("ITM009", "Beef (per kg)",          "kg",     800.00,  650.00,  50),
             ("ITM010", "Soft Drink 500ml",       "bottle",  70.00,   50.00, 200),
         ]
-        c.executemany(
+        c.executemany( #insert multiple rows at once
             "INSERT INTO items (code, name, unit, unit_price, cost_price, stock_qty) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             sample_items,
+        )
+
+    c.execute("SELECT COUNT(*) FROM Users")
+    if c.fetchone()[0] == 0:
+        default_password_hash = _hash_password("pass123")
+        employees = [
+            #list of managers
+            ("M001", "Sarabel", "Dominion", default_password_hash, "manager"),
+            ("M002", "Kendie", "Daniella", default_password_hash, "manager"),
+
+            #list of cashiers
+            ("C001", "Brian", "Otieno", default_password_hash, "cashier"),
+            ("C002", "Diana", "Mwangi", default_password_hash, "cashier"),
+
+            #list of inventory guys
+            ("I001", "Kevin", "Kariuki", default_password_hash, "inventory"),
+            ("I002", "Faith", "Njeri", default_password_hash, "inventory"),
+        ]
+        c.executemany(
+            "INSERT INTO Users (empID, firstName, lastName, password, role) "
+            "VALUES (?, ?, ?, ?, ?)",
+            employees
         )
 
     conn.commit()

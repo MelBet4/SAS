@@ -17,6 +17,7 @@ def _center(text):
     return text.center(WIDTH)
 
 
+#print customer's receipt
 def print_bill(txn_id: int, bill_lines: list, total: float,
                cashier: str = "clerk", txn_date: str = None, txn_time: str = None):
     """Print a formatted sales receipt."""
@@ -25,7 +26,7 @@ def print_bill(txn_id: int, bill_lines: list, total: float,
 
     print("\n" + _line("="))
     print(_center("SMART SUPERMARKET"))
-    print(_center("Nairobi, Kenya  |  Tel: +254-700-000-000"))
+    print(_center("Nairobi, Kenya  |  Tel: +254-702-456-089"))
     print(_line("="))
     print(f"  Receipt No : {txn_id:06d}")
     print(f"  Date       : {txn_date}    Time: {txn_time}")
@@ -48,6 +49,7 @@ def print_bill(txn_id: int, bill_lines: list, total: float,
     print(_line("=") + "\n")
 
 
+#print inventory report
 def print_inventory(items):
     """Display full inventory table."""
     print("\n" + _line("="))
@@ -65,7 +67,7 @@ def print_inventory(items):
         )
     print(_line("=") + "\n")
 
-
+#print sales statistics for manager review
 def print_sales_stats(rows, date_from: str, date_to: str):
     """Display sales statistics report."""
     print("\n" + _line("="))
